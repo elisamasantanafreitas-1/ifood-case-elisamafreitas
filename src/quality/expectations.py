@@ -126,7 +126,7 @@ def split_valid_and_rejected(
         Tupla ``(valid, rejected)``. ``valid`` não carrega a coluna de motivos;
         ``rejected`` carrega, com pelo menos um motivo por linha.
     """
-    flagged = with_rejection_reasons(df, rules).cache()
+    flagged = with_rejection_reasons(df, rules)
     valid = flagged.filter(F.size(REJECTION_COLUMN) == 0).drop(REJECTION_COLUMN)
     rejected = flagged.filter(F.size(REJECTION_COLUMN) > 0)
     return valid, rejected
