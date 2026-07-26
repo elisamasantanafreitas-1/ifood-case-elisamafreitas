@@ -1,0 +1,12 @@
+# Dependências para desenvolvimento local e CI.
+# No Databricks (Free Edition / serverless) pyspark, pandas e matplotlib já vêm
+# instalados no runtime — este arquivo existe para rodar os testes fora do cluster.
+
+pyspark==3.5.1
+requests==2.32.3
+pandas==2.2.2
+matplotlib==3.9.2
+
+# Qualidade de código e testes
+pytest==8.3.3
+ruff==0.6.9
