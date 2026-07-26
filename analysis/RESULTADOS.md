@@ -29,9 +29,12 @@ linhagem `_source_file`.
 
 ## Qualidade de dados
 
-Motivos registrados em `ifood_case.refined.rej_taxi_trip`:
+Motivos registrados em `ifood_case.refined.rej_taxi_trip`. **Atenção ao escopo:** as regras
+rodam sobre a frota inteira, então a contagem abaixo é de yellow **mais** green, enquanto a
+volumetria da seção anterior é só de yellow. Uma linha pode acumular mais de um motivo, por
+isso a soma dos motivos não coincide com o número de linhas em quarentena.
 
-| Regra | Bloqueante | Ocorrências |
+| Regra | Bloqueante | Ocorrências (frota completa) |
 |---|---|---|
 | `total_amount_negativo` | sim | 142.323 |
 | `duracao_nao_positiva` | sim | 6.596 |
@@ -68,7 +71,8 @@ O enunciado admite duas leituras, com números diferentes. Ambas abaixo.
 | 2023-04 | 3.257.297 | 28,76 | 21,00 | 93.673.461,72 |
 | 2023-05 | 3.480.704 | 29,46 | 21,48 | 102.538.428,01 |
 
-**Ticket médio do período: US$ 28,30**
+**Ticket médio ponderado do período: US$ 28,30** (receita total ÷ corridas totais). A média
+simples dos cinco tickets mensais é US$ 28,25.
 
 ### Leitura B · faturamento médio mensal da frota yellow
 
@@ -88,23 +92,32 @@ Quanto a decisão de quarentenar os `total_amount` negativos altera a resposta:
 | Aprovadas (fato) | 16.038.626 | 28,3004 | 453.898.989,14 |
 | Aprovadas + negativos | 16.180.008 | 27,8375 | 450.410.956,55 |
 
-As 141.382 corridas com valor negativo deslocam o ticket médio em -1,64% e a
-receita em -0,77%. O impacto é pequeno, então a decisão é segura para publicar.
-Se a área de negócio confirmar que esses registros são estornos que devem compor
-a receita líquida, basta reincorporá-los a partir da quarentena — nenhum dado foi
-perdido.
+As 141.382 corridas do segundo cenário são as yellow reprovadas **exclusivamente** por
+`total_amount_negativo`. A diferença para as 142.323 ocorrências da tabela de qualidade tem
+duas origens: aquela contagem inclui green, e algumas linhas acumulam outro motivo além do
+valor negativo, o que as manteria fora do fato de qualquer forma.
+
+Reincorporá-las desloca o ticket médio em -1,64% e a receita em -0,77%. O impacto é pequeno,
+mas a semântica desses registros não está definida no enunciado: podem ser estornos,
+cancelamentos ou erro de taxímetro. Por isso os dois cenários são apresentados lado a lado
+em vez de um só. A decisão definitiva dependeria de validação com a área de negócio, e como
+nada foi apagado, reincorporar é uma consulta.
 
 ### Interpretação
 
-O ticket médio sobe de forma contínua e suave: de US$ 27,44 em janeiro para
-US$ 29,46 em maio, alta de 7,3% em cinco meses. É um movimento gradual, sem
-saltos, compatível com reajuste tarifário e inflação — não com mudança de
-comportamento do passageiro.
+O ticket médio cai levemente de janeiro para fevereiro (US$ 27,44 para US$ 27,33) e sobe de
+forma consistente de março a maio, fechando em US$ 29,46. A alta líquida no período é de
+7,3%, sem saltos bruscos.
 
-A receita mensal oscila muito mais: de US$ 78,9 milhões a US$ 102,5 milhões, 30%
-de variação. Como o preço por corrida quase não muda, essa oscilação é explicada
-quase inteiramente por **volume**. Fevereiro é o menor mês do período por ter
-menos dias; maio é o maior.
+A receita oscila mais: de US$ 78,9 milhões a US$ 102,5 milhões, 30% entre o menor e o maior
+mês. Decompondo o trecho de fevereiro a maio, as corridas crescem 20,5% e o ticket 7,8%,
+resultando em 29,9% de receita. O volume é o fator predominante, com contribuição relevante
+do ticket.
+
+O que as cinco colunas do case **não** permitem é atribuir causa a esse crescimento. Reajuste
+tarifário, inflação, mudança na distância média das viagens ou na proporção de corridas de
+aeroporto produziriam todos o mesmo efeito no `total_amount`. Distinguir entre eles exigiria
+distância, tarifa base e localização.
 
 Vale registrar que a mediana fica consistentemente uns US$ 7 a 8 abaixo da média
 (US$ 21,48 contra US$ 29,46 em maio). É a assinatura de uma cauda de corridas
@@ -124,10 +137,11 @@ que precisa ser previsto é o número de corridas, não o valor de cada uma.
 **Escopo — "toda a frota":** yellow + green. As bases FHV e High Volume FHV da TLC
 (Uber, Lyft) não são táxis licenciados e sequer publicam `passenger_count`.
 
-**Filtro:** corridas com `passenger_count` nulo ou zero saem desta análise
-específica, não da base. No agregado horário, a diferença entre `trip_count` e
-`trips_with_passenger_count` é de cerca de 8%; tratar esses registros como
-corridas sem ninguém dentro afundaria a média artificialmente.
+**Filtro:** a análise usa `passenger_count > 0`, o que exclui dois casos distintos. Os nulos
+o `AVG` já ignoraria sozinho, então não mudam o resultado. Os **zeros** é que importam: são
+cerca de 8% das corridas do agregado horário, e mantê-los puxaria a média para baixo tratando
+como "corrida sem ninguém dentro" um registro que quase certamente é falha de preenchimento.
+A exclusão vale para esta análise, não para a base.
 
 ### Leitura A · ocupação média por corrida
 
@@ -163,43 +177,9 @@ linha — o que valida a tabela agregada.
 
 ### Leitura B · passageiros por hora num dia típico de maio
 
-Maio tem 31 dias, e todas as 24 horas têm dado nos 31 dias.
-
-| Hora | Passageiros no mês | Passageiros / dia típico |
-|---|---|---|
-| 00 | 127.852 | 4.124,3 |
-| 01 | 83.682 | 2.699,4 |
-| 02 | 54.627 | 1.762,2 |
-| 03 | 35.588 | 1.148,0 |
-| 04 | 22.563 | 727,8 |
-| 05 | 23.849 | 769,3 |
-| 06 | 58.644 | 1.891,7 |
-| 07 | 120.634 | 3.891,4 |
-| 08 | 166.063 | 5.356,9 |
-| 09 | 188.857 | 6.092,2 |
-| 10 | 210.925 | 6.804,0 |
-| 11 | 232.387 | 7.496,4 |
-| 12 | 252.750 | 8.153,2 |
-| 13 | 259.702 | 8.377,5 |
-| 14 | 283.949 | 9.159,6 |
-
-### Abertura por tipo de táxi
-
-| Hora | Yellow | Green |
-|---|---|---|
-| 00 | 1,4274 | 1,3794 |
-| 01 | 1,4380 | 1,3289 |
-| 02 | 1,4554 | 1,3808 |
-| 03 | 1,4524 | 1,3165 |
-| 04 | 1,4049 | 1,3477 |
-| 05 | 1,2844 | 1,2895 |
-| 06 | 1,2613 | 1,2790 |
-| 07 | 1,2821 | 1,2571 |
-| 08 | 1,2957 | 1,2106 |
-| 09 | 1,3121 | 1,2600 |
-| 10 | 1,3477 | 1,2874 |
-| 11 | 1,3623 | 1,3234 |
-| 12 | 1,3762 | 1,2963 |
+Maio tem 31 dias e todas as 24 horas têm dado nos 31 dias. Nos extremos: às 4h circulam 728
+passageiros por hora num dia típico, contra 9.160 às 14h. A tabela completa das 24 horas e a
+abertura por tipo de táxi estão em `analysis/02_respostas.ipynb`, seções 2.B e 2.C.
 
 ### Interpretação
 
@@ -207,17 +187,17 @@ A resposta numérica é que a ocupação média fica entre 1,2617 e 1,4543 passa
 por corrida. Mas o dado interessante não é o intervalo — é **onde** cada extremo
 cai, e o formato da curva.
 
-A ocupação desenha um **U ao longo do dia**, e ele é quase o espelho da curva de
-volume. Entre 0h e 4h o volume é o menor do dia (16.074 corridas às 4h), mas a
-ocupação é a mais alta: 1,4543 às 2h. São grupos voltando juntos de bar,
-restaurante, evento. Às 6h acontece o inverso exato: a ocupação despenca para
-1,2617, o mínimo absoluto, porque é o passageiro solitário indo trabalhar. A
-partir daí ela sobe de volta ao longo do dia e fecha a noite novamente acima de
-1,42 às 22h.
+A ocupação desenha um **U ao longo do dia**, quase o espelho da curva de volume. Entre 0h e
+4h o volume é o menor do dia (16.074 corridas às 4h), mas a ocupação é a mais alta: 1,4543 às
+2h. Às 6h acontece o inverso: a ocupação cai para 1,2617, o mínimo absoluto, justamente
+quando o volume começa a subir. A partir daí ela se recupera ao longo do dia e fecha a noite
+novamente acima de 1,42 às 22h.
 
-Ou seja: **o horário muda o tipo de viagem, não apenas a quantidade.** A
-madrugada e a noite são sociais e compartilhadas; o início da manhã é individual
-e pendular.
+O padrão é claro; a explicação é hipótese. Viagens de lazer compartilhadas na madrugada e
+deslocamento pendular individual pela manhã explicariam bem o formato, mas as colunas
+exigidas pelo case não trazem propósito da viagem, origem, destino nem dia da semana.
+Confirmar isso exigiria cruzar com `PULocationID`/`DOLocationID` e separar dia útil de fim de
+semana, o que está fora do escopo pedido.
 
 Isso tem consequência prática direta. Dimensionar frota pela ocupação média seria
 um erro grosseiro — pela Leitura A, 4h da manhã (1,4037) e 18h (1,3812) parecem
@@ -249,7 +229,7 @@ WHERE pickup_year = '2023' AND pickup_month = '05'
 GROUP BY pickup_hour
 ORDER BY pickup_hour;
 
--- Qualidade
+-- Qualidade (frota completa; acrescente WHERE trip_type = 'yellow' para o recorte)
 SELECT motivo, COUNT(*) AS linhas
 FROM ifood_case.refined.rej_taxi_trip
 LATERAL VIEW explode(_rejection_reasons) AS motivo
