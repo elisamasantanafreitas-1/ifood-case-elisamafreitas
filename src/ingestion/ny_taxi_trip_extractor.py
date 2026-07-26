@@ -49,7 +49,7 @@ def month_range(start: date, end: date) -> list[tuple[int, int]]:
     Implementado na mão para não depender de ``dateutil``, que nem sempre está
     presente no runtime serverless.
     """
-    if start > end:
+    if (start.year, start.month) > (end.year, end.month):
         raise ValueError(f"start ({start}) não pode ser maior que end ({end})")
 
     months: list[tuple[int, int]] = []
