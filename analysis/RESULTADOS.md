@@ -29,27 +29,33 @@ linhagem `_source_file`.
 
 ## Qualidade de dados
 
-Motivos registrados em `ifood_case.refined.rej_taxi_trip`. **Atenção ao escopo:** as regras
-rodam sobre a frota inteira, então a contagem abaixo é de yellow **mais** green, enquanto a
-volumetria da seção anterior é só de yellow. Uma linha pode acumular mais de um motivo, por
-isso a soma dos motivos não coincide com o número de linhas em quarentena.
+Linhas encaminhadas à quarentena, contadas em `ifood_case.refined.rej_taxi_trip` por motivo.
+**Atenção ao escopo:** as regras rodam sobre a frota inteira, então a contagem abaixo é de
+yellow **mais** green, enquanto a volumetria da seção anterior é só de yellow. Uma linha pode
+acumular mais de um motivo, por isso a soma dos motivos não coincide com o número de linhas
+em quarentena.
 
-| Regra | Bloqueante | Ocorrências (frota completa) |
-|---|---|---|
-| `total_amount_negativo` | sim | 142.323 |
-| `duracao_nao_positiva` | sim | 6.596 |
-| `fora_da_janela_de_analise` | sim | 113 |
-| `duracao_acima_de_24h` | sim | 94 |
-| `pickup_datetime_nulo` | sim | 0 |
-| `dropoff_datetime_nulo` | sim | 0 |
-| `total_amount_nulo` | sim | 0 |
-| `passenger_count_ausente` | não | não bloqueia |
+| Regra bloqueante | Linhas na quarentena (frota completa) |
+|---|---|
+| `total_amount_negativo` | 142.323 |
+| `duracao_nao_positiva` | 6.596 |
+| `fora_da_janela_de_analise` | 113 |
+| `duracao_acima_de_24h` | 94 |
+| `pickup_datetime_nulo` | 0 |
+| `dropoff_datetime_nulo` | 0 |
+| `total_amount_nulo` | 0 |
 
-Menos de 1% da base saiu das análises, e nenhuma linha foi apagada: todas estão na
-quarentena com o motivo, auditáveis e reprocessáveis.
+A oitava regra, `passenger_count_ausente`, é não bloqueante por decisão de projeto: a corrida
+sem contagem de passageiros continua válida para receita. Como ela não retira a linha do
+fato, não aparece nesta tabela. A medição de todas as regras, bloqueantes ou não, com total
+avaliado e percentual de reprovação, fica em `ifood_case.quality.dq_results`.
 
-Os 113 registros fora da janela são o caso mais ilustrativo. São corridas com
-timestamp corrompido na origem — datas de 2001, 2008 e similares. São poucos, mas
+No recorte yellow, 0,91% das corridas saíram das análises. Nenhuma linha foi apagada: todas
+estão na quarentena com o motivo, auditáveis e reprocessáveis.
+
+Os 113 registros fora da janela são o caso mais ilustrativo. São corridas com timestamp
+anômalo na origem, com datas de 2001, 2008 e similares. A causa não é observável a partir das
+colunas disponíveis; o que se pode afirmar é que estão fora do período que o case pede. São poucos, mas
 sem esse filtro apareceriam como meses fantasma no resultado da Pergunta 1: um
 `GROUP BY` por mês de embarque devolveria linhas como `2001-01` ao lado dos meses
 reais.
@@ -59,7 +65,10 @@ reais.
 > Qual a média de valor total (`total_amount`) recebido em um mês considerando
 > todos os yellow táxis da frota?
 
-O enunciado admite duas leituras, com números diferentes. Ambas abaixo.
+A referência direta à coluna `total_amount` leva ao ticket médio por corrida agrupado por
+mês, que é a Leitura A. Como o enunciado também comporta ler "valor total recebido em um mês"
+como o faturamento do mês, a Leitura B traz a média das somas mensais. As duas dão números
+diferentes e ambas estão abaixo.
 
 ### Leitura A · ticket médio por corrida
 
@@ -100,8 +109,9 @@ valor negativo, o que as manteria fora do fato de qualquer forma.
 Reincorporá-las desloca o ticket médio em -1,64% e a receita em -0,77%. O impacto é pequeno,
 mas a semântica desses registros não está definida no enunciado: podem ser estornos,
 cancelamentos ou erro de taxímetro. Por isso os dois cenários são apresentados lado a lado
-em vez de um só. A decisão definitiva dependeria de validação com a área de negócio, e como
-nada foi apagado, reincorporar é uma consulta.
+em vez de um só. A decisão definitiva dependeria de validação com a área de negócio. Como nada foi apagado,
+as linhas podem ser inspecionadas direto na quarentena ou reincorporadas ao fato mediante
+ajuste da regra e reprocessamento.
 
 ### Interpretação
 
@@ -119,33 +129,39 @@ tarifário, inflação, mudança na distância média das viagens ou na proporç
 aeroporto produziriam todos o mesmo efeito no `total_amount`. Distinguir entre eles exigiria
 distância, tarifa base e localização.
 
-Vale registrar que a mediana fica consistentemente uns US$ 7 a 8 abaixo da média
-(US$ 21,48 contra US$ 29,46 em maio). É a assinatura de uma cauda de corridas
-caras — aeroporto, tarifas negociadas, viagens longas — puxando a média para
-cima. Para acompanhamento operacional da corrida típica, a mediana descreve
-melhor a realidade.
+Vale registrar que a mediana fica consistentemente uns US$ 7 a 8 abaixo da média (US$ 21,48
+contra US$ 29,46 em maio). A distribuição tem cauda longa à direita: um grupo pequeno de
+corridas caras puxa a média para cima. Identificar o que compõe essa cauda exigiria
+`trip_distance` e `RatecodeID`, que estão fora das colunas do case. Para acompanhamento
+operacional da corrida típica, a mediana descreve melhor a realidade.
 
-A distinção entre as duas leituras importa na prática: para monitorar saúde de
-preço, a métrica é o ticket médio; para planejar receita, é o faturamento — e o
-que precisa ser previsto é o número de corridas, não o valor de cada uma.
+A distinção entre as duas leituras importa na prática: para monitorar saúde de preço, a
+métrica é o ticket médio; para planejar receita, é o faturamento. Prever receita exige
+modelar os dois componentes, volume e ticket. No período analisado o volume foi o
+predominante, mas a variação do ticket teve contribuição relevante.
 
 ## Pergunta 2 — média de `passenger_count` por hora (maio/2023)
 
 > Qual a média de passageiros (`passenger_count`) por cada hora do dia que pegaram
 > táxi no mês de maio considerando todos os táxis da frota?
 
-**Escopo — "toda a frota":** yellow + green. As bases FHV e High Volume FHV da TLC
-(Uber, Lyft) não são táxis licenciados e sequer publicam `passenger_count`.
+**Escopo — "todos os táxis da frota":** yellow + green. As bases FHV e High Volume FHV,
+esta última cobrindo plataformas como Uber e Lyft, são categorias de serviço distintas dos
+táxis de medalhão, ainda que também reguladas pela TLC, e não publicam `passenger_count`.
+Ficam fora desta análise por esses dois motivos.
 
 **Filtro:** a análise usa `passenger_count > 0`, o que exclui dois casos distintos. Os nulos
-o `AVG` já ignoraria sozinho, então não mudam o resultado. Os **zeros** é que importam: são
-cerca de 8% das corridas do agregado horário, e mantê-los puxaria a média para baixo tratando
-como "corrida sem ninguém dentro" um registro que quase certamente é falha de preenchimento.
-A exclusão vale para esta análise, não para a base.
+o `AVG` já ignoraria sozinho, então não mudam o resultado. Os **zeros** é que importam, e excluí-los é uma escolha, não uma consequência do `AVG`:
+mantê-los puxaria as médias para baixo. A hipótese adotada é que zero representa ausência de
+informação e não uma corrida sem ocupantes, mas o enunciado não define essa semântica e as
+cinco colunas não permitem verificá-la. Os números abaixo são, portanto, a versão curada; a
+média literal com zeros incluídos seria menor em todas as horas. A distribuição completa de
+`passenger_count`, separando nulo, zero, negativo e positivo, está em
+`analysis/01_analise_exploratoria.ipynb`. A exclusão vale para esta análise, não para a base.
 
 ### Leitura A · ocupação média por corrida
 
-| Hora | Corridas | Média de passageiros |
+| Hora | Corridas com `passenger_count > 0` | Média de passageiros |
 |---|---|---|
 | 00 | 89.604 | 1,4269 |
 | 01 | 58.249 | 1,4366 |
@@ -177,9 +193,10 @@ linha — o que valida a tabela agregada.
 
 ### Leitura B · passageiros por hora num dia típico de maio
 
-Maio tem 31 dias e todas as 24 horas têm dado nos 31 dias. Nos extremos: às 4h circulam 728
-passageiros por hora num dia típico, contra 9.160 às 14h. A tabela completa das 24 horas e a
-abertura por tipo de táxi estão em `analysis/02_respostas.ipynb`, seções 2.B e 2.C.
+Maio tem 31 dias. O mínimo do dia está às 4h, com cerca de 728 passageiros por hora num dia
+típico; às 14h são cerca de 9.160. O pico não está às 14h e sim no fim da tarde, acompanhando
+a curva de volume de corridas. A tabela completa das 24 horas e a abertura por tipo de táxi
+estão em `analysis/02_respostas.ipynb`, seções 2.B e 2.C.
 
 ### Interpretação
 
@@ -199,17 +216,21 @@ exigidas pelo case não trazem propósito da viagem, origem, destino nem dia da 
 Confirmar isso exigiria cruzar com `PULocationID`/`DOLocationID` e separar dia útil de fim de
 semana, o que está fora do escopo pedido.
 
-Isso tem consequência prática direta. Dimensionar frota pela ocupação média seria
-um erro grosseiro — pela Leitura A, 4h da manhã (1,4037) e 18h (1,3812) parecem
-praticamente equivalentes. Pela Leitura B, que é a que importa para operação, às
-4h circulam 16.074 corridas e às 18h circulam 242.994: **quinze vezes mais**. As
-duas leituras respondem perguntas diferentes, e por isso as duas foram entregues.
+Isso tem consequência prática direta. Dimensionar frota apenas pela ocupação média seria
+insuficiente: pela ocupação, 4h da manhã (1,4037) e 18h (1,3812) parecem praticamente
+equivalentes. Em volume não são. Às 4h a frota registra 16.074 corridas; às 18h, 242.994.
+São **15,1 vezes mais**, e a mesma proporção se reflete no total de passageiros
+transportados. Ocupação e volume respondem perguntas diferentes, e por isso as duas leituras
+foram entregues.
 
-Yellow e green têm perfis parecidos, com o yellow consistentemente um pouco mais
-ocupado na madrugada — coerente com a concentração do yellow em Manhattan, onde
-está a vida noturna, enquanto o green atende os boroughs externos.
+Yellow e green têm perfis parecidos. Entre 0h e 4h o yellow é o mais ocupado em todas as
+horas, com diferença de até 0,14 passageiro por corrida às 3h; às 5h e 6h a relação se
+inverte e o green fica ligeiramente à frente. Uma explicação possível é a diferença de área
+de atuação entre os dois tipos, já que a regulação da TLC restringe o green na região central
+de Manhattan, mas isso é informação externa: as colunas do case não trazem localização, e
+confirmar exigiria `PULocationID`.
 
-## Como reproduzir
+## Consultas principais
 
 ```sql
 -- Pergunta 1
